@@ -4,21 +4,23 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { CoffeeEntity } from './entites/coffee.entity';
+import { Coffee } from './entites/coffee.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Connection, Repository } from 'typeorm';
 import { CreateCoffeeDto } from './dto/create-coffee.dto';
 import { UpdateCoffeeDto } from './dto/update-coffee.dto';
-import { FlavorEntity } from './entities/flavor.entity';
+import { Flavor } from './entities/flavor.entity';
+import { Event } from '../events/entities/event.entity';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 
 @Injectable()
 export class CoffeesService {
   constructor(
-    @InjectRepository(CoffeeEntity)
-    private readonly coffeeRepository: Repository<CoffeeEntity>,
-    @InjectRepository(FlavorEntity)
-    private readonly flavorRepository: Repository<FlavorEntity>,
+    @InjectRepository(Coffee)
+    private readonly coffeeRepository: Repository<Coffee>,
+    @InjectRepository(Flavor)
+    private readonly flavorRepository: Repository<Flavor>,
+    private readonly connection: Connection,
   ) {}
 
   findAll(paginationQuery: PaginationQueryDto) {
@@ -74,7 +76,30 @@ export class CoffeesService {
     return this.coffeeRepository.remove(coffee);
   }
 
-  private async preloadFlavorByName(name: string): Promise<FlavorEntity> {
+  async recommendCoffee(coffee: Coffee) {
+    const queryRunner = this.connection.createQueryRunner();
+
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      coffee.recommendations++;
+      const recommendEvent = new Event();
+      recommendEvent.name = 'recommend_coffee';
+      recommendEvent.type = 'coffee';
+      recommendEvent.payload = { coffeeId: coffee.id };
+
+      await queryRunner.manager.save(coffee);
+      await queryRunner.manager.save(recommendEvent);
+
+      await queryRunner.commitTransaction();
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  private async preloadFlavorByName(name: string): Promise<Flavor> {
     const existingFlavor = await this.flavorRepository.findOneBy({ name });
     if (existingFlavor) {
       return existingFlavor;
