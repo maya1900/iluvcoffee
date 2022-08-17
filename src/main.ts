@@ -8,7 +8,10 @@ async function bootstrap() {
     new ValidationPipe({
       whitelist: true,
       transform: true,
-      forbidNonWhitelisted: true,
+      forbidNonWhitelisted: true, // 传没有定义的报错
+      transformOptions: {
+        enableImplicitConversion: true, // 隐式转换
+      },
     }),
   );
   await app.listen(3000);
