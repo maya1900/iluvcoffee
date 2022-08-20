@@ -16,7 +16,7 @@ async function bootstrap() {
       },
     }),
   );
-  app.useGlobalGuards(new ApiKeyGuard());
+  // app.useGlobalGuards(new ApiKeyGuard());
   await app.listen(3000);
 }
 
